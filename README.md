@@ -4,12 +4,17 @@ A nylon-string acoustic guitar built from arithmetic, playing a bossa nova jam. 
 
 ```bash
 python3 bossa_nova.py   # writes bossa_nova.wav (24.2 s, renders in ~1.5 s)
+python3 bossa_trio.py   # writes bossa_trio.wav (23.9 s, renders in ~4 s): guitar, bass and drums
 ```
 
 | File | Role |
 |---|---|
 | [`acoustic_guitar.py`](acoustic_guitar.py) | The instrument: strings, body, room |
 | [`bossa_nova.py`](bossa_nova.py) | The music: chords, rhythm, human feel |
+| [`electric_bass.py`](electric_bass.py) | Four steel strings, a pickup, a tone knob and an amp |
+| [`drum_kit.py`](drum_kit.py) | Kick, snare, cross-stick, hi-hats, toms, ride |
+| [`mixer.py`](mixer.py) | Several instruments into one stereo `.wav` |
+| [`bossa_trio.py`](bossa_trio.py) | The same jam for guitar, bass and drums |
 | [`explainer/guitar-from-code.html`](explainer/guitar-from-code.html) | 21-page illustrated explainer (open in a browser) |
 | [`examples/baitikochi-chuste/`](examples/baitikochi-chuste/) | Example: a film melody transcribed from a played performance, with slides |
 
