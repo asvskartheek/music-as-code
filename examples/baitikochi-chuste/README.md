@@ -11,7 +11,7 @@ cd examples/baitikochi-chuste
 python3 baitikochi_chuste.py
 ```
 
-That writes `baitikochi_chuste.wav` next to the script (about 4 seconds to render). The `.wav` is git-ignored, so generate it yourself.
+That writes `baitikochi_chuste.wav` next to the script (about 3 seconds to render). The `.wav` is git-ignored, so generate it yourself.
 
 Play it:
 
