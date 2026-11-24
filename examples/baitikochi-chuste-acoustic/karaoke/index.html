@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Karaoke</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="data.js"></script>
+    <style>
+      :root {
+        --bg: #14100c;
+        --wood: #2a1d12;
+        --string: #8a7355;
+        --dim: #b9a88f;
+        --text: #f6efe3;
+        --accent: #ffb347;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, sans-serif;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+      .layer {
+        position: absolute;
+        inset: 0;
+      }
+      #backdrop {
+        background: radial-gradient(1200px 800px at 50% 55%, var(--wood), var(--bg));
+      }
+      /* six guitar strings that shimmer on every strum */
+      .string {
+        position: absolute;
+        left: 0;
+        width: 1920px;
+        background: var(--string);
+        opacity: 0.22;
+      }
+      /* chord panel */
+      #chord-now {
+        position: absolute;
+        left: 120px;
+        top: 96px;
+        font-size: 150px;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--accent);
+      }
+      .chord {
+        position: absolute;
+        left: 0;
+        top: 0;
+        white-space: nowrap;
+      }
+      #chord-next {
+        position: absolute;
+        right: 120px;
+        top: 120px;
+        width: 420px;
+        height: 90px;
+        font-size: 72px;
+        font-weight: 600;
+        line-height: 1;
+        color: var(--dim);
+        text-align: right;
+      }
+      #chord-next .chord {
+        left: auto;
+        right: 0;
+      }
+      /* four dots: where we are in the bar */
+      #beats {
+        position: absolute;
+        left: 124px;
+        top: 290px;
+        display: flex;
+        gap: 22px;
+      }
+      .beat {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: var(--dim);
+      }
+      /* lyrics */
+      #lyrics {
+        position: absolute;
+        left: 140px;
+        top: 520px;
+        width: 1640px;
+        height: 400px;
+      }
+      .line {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1640px;
+        height: 130px;
+        display: flex;
+        justify-content: center;
+      }
+      .words {
+        position: relative;
+        display: block;
+        white-space: nowrap;
+        font-size: 96px;
+        font-weight: 700;
+        line-height: 130px;
+        color: var(--text);
+      }
+      .sung {
+        position: absolute;
+        left: 0;
+        top: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        color: var(--accent);
+      }
+      #countin {
+        position: absolute;
+        left: 0;
+        top: -70px;
+        width: 1640px;
+        height: 30px;
+        display: flex;
+        justify-content: center;
+        gap: 26px;
+      }
+      .tick {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: var(--accent);
+      }
+      #progress {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        width: 1920px;
+        height: 10px;
+        background: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-width="1920" data-height="1080" data-duration="62">
+      <div id="backdrop" class="layer"></div>
+      <div id="strings" class="layer"></div>
+      <div id="chord-now"></div>
+      <div id="chord-next"></div>
+      <div id="beats">
+        <div class="beat"></div>
+        <div class="beat"></div>
+        <div class="beat"></div>
+        <div class="beat"></div>
+      </div>
+      <div id="lyrics">
+        <div id="countin">
+          <div class="tick"></div>
+          <div class="tick"></div>
+          <div class="tick"></div>
+        </div>
+      </div>
+      <div id="progress"></div>
+      <audio id="backing" src="chords.wav" data-start="0" data-duration="62" data-track-index="10" data-volume="1"></audio>
+    </div>
+    <script>
+      const K = window.KARAOKE;
+      const tl = gsap.timeline({ paused: true });
+      const make = (parent, cls, text) => {
+        const el = document.createElement("div");
+        el.className = cls;
+        if (text !== undefined) el.textContent = text;
+        parent.appendChild(el);
+        return el;
+      };
+
+      // ---- strings: one shimmer per beat, low strings thicker -----------------
+      const strings = [];
+      for (let i = 0; i < 6; i++) {
+        const s = make(document.getElementById("strings"), "string");
+        s.style.top = 395 + i * 14 + "px";
+        s.style.height = 6 - i * 0.7 + "px";
+        strings.push(s);
+      }
+      // ---- beat dots and string shimmer --------------------------------------
+      const dots = gsap.utils.toArray(".beat");
+      gsap.set(dots, { opacity: 0.25, transformOrigin: "50% 50%" });
+      for (let b = 0; b < K.beats; b++) {
+        const t = K.start + b * K.beat;
+        const dot = dots[b % 4];
+        tl.fromTo(dot, { opacity: 1, scale: 1.5 }, { opacity: 0.25, scale: 1, duration: K.beat * 0.9, ease: "power2.out" }, t);
+        tl.fromTo(strings, { opacity: b % 4 === 0 ? 0.75 : 0.45 },
+          { opacity: 0.22, duration: K.beat * 0.9, ease: "power2.out", stagger: 0.012 }, t);
+      }
+
+      // ---- chords: current one large, the next one waiting on the right ------
+      const now = document.getElementById("chord-now");
+      const next = document.getElementById("chord-next");
+      K.chords.forEach((c, i) => {
+        const end = i + 1 < K.chords.length ? K.chords[i + 1].t : K.length;
+        const el = make(now, "chord", c.name);
+        if (i > 0) tl.set(el, { autoAlpha: 0 }, 0);
+        if (i === 0) tl.set(el, { autoAlpha: 1 }, 0);
+        else tl.fromTo(el, { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, duration: 0.12, ease: "power2.out" }, c.t - 0.06);
+        if (end < K.length) tl.to(el, { autoAlpha: 0, duration: 0.08 }, end - 0.08);
+        if (i > 0) {
+          const from = K.chords[i - 1].t;
+          const wait = make(next, "chord", c.name);
+          tl.set(wait, { autoAlpha: 0 }, 0);
+          tl.to(wait, { autoAlpha: 1, duration: 0.15 }, from + 0.05);
+          tl.to(wait, { autoAlpha: 0, duration: 0.08 }, c.t - 0.08);
+        }
+      });
+
+      // ---- lyrics: next line waits below, rises, then fills as it is sung ----
+      const lyrics = document.getElementById("lyrics");
+      const WAIT_Y = 170;
+      const lines = K.lines;
+      const ticks = gsap.utils.toArray(".tick");
+      gsap.set(ticks, { autoAlpha: 0 });
+      lines.forEach((line, i) => {
+        const el = make(lyrics, "line");
+        const words = make(el, "words", line.text);
+        const sung = make(words, "sung", line.text);
+        const width = words.offsetWidth;
+        if (width > 1600) words.style.fontSize = Math.floor((96 * 1600) / width) + "px";
+
+        const prev = lines[i - 1];
+        const following = lines[i + 1];
+        const rise = Math.max(0, line.t - 0.3);
+        const show = prev ? Math.max(prev.t - 0.3, line.t - 6) : Math.max(0, line.t - 4);
+        const leave = following ? Math.min(line.end, following.t - 0.3) : line.end;
+
+        tl.set(el, { autoAlpha: 0 }, 0);
+        tl.set(sung, { clipPath: "inset(0% 100% 0% 0%)" }, 0);
+        if (show < rise - 0.3) {
+          tl.fromTo(el, { autoAlpha: 0, y: WAIT_Y + 30, scale: 0.62 },
+            { autoAlpha: 0.5, y: WAIT_Y, scale: 0.62, duration: 0.25, ease: "power2.out" }, show);
+          tl.to(el, { autoAlpha: 1, y: 0, scale: 1, duration: 0.28, ease: "power3.out" }, rise);
+        } else {
+          tl.fromTo(el, { autoAlpha: 0, y: 40, scale: 1 }, { autoAlpha: 1, y: 0, duration: 0.28, ease: "power3.out" }, rise);
+        }
+        tl.to(sung, { clipPath: "inset(0% 0% 0% 0%)", duration: line.end - line.t, ease: "none" }, line.t);
+        tl.to(el, { autoAlpha: 0, y: -70, duration: 0.25, ease: "power2.in" }, Math.max(leave - 0.25, line.t + 0.1));
+
+        // after a silence, count the singer in over three beats
+        const gap = line.t - (prev ? prev.end : 0);
+        if (gap >= 3 * K.beat + 0.5) {
+          ticks.forEach((tick, n) => {
+            const at = line.t - (3 - n) * K.beat;
+            tl.fromTo(tick, { autoAlpha: 0, scale: 0.4 }, { autoAlpha: 1, scale: 1, duration: 0.12, ease: "back.out(2)" }, at);
+          });
+          tl.to(ticks, { autoAlpha: 0, duration: 0.15 }, line.t);
+        }
+      });
+
+      // ---- progress and the fade at the end ----------------------------------
+      tl.fromTo("#progress", { scaleX: 0, transformOrigin: "0% 50%" }, { scaleX: 1, duration: K.length, ease: "none" }, 0);
+      tl.to("#backing", { volume: 0, duration: 1.5, ease: "none" }, K.length - 1.5);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

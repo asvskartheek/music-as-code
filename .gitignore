@@ -1,2 +1,6 @@
 __pycache__/
 examples/**/*.wav
+examples/**/*.mp4
+examples/**/lyrics.lrc
+examples/**/data.js
+.hyperframes/
