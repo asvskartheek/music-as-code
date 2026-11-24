@@ -1,12 +1,12 @@
 """Prepare everything the karaoke video needs.
 
-  chords.wav  - the strummed chord guitar alone, synthesised
+  chords.wav  - the fingerpicked chord guitar alone, synthesised
   data.js     - chord changes, beat grid and timed lyric lines for index.html
 
 Lyrics are read from lyrics.lrc in this folder (not in the repo: add your own).
-Each line is a standard LRC line, timed from the start of the video:
+Each line is a standard LRC line, timed against the original recording (the video follows its clock):
 
-    [00:12.40] words of the line
+    [00:27.35] words of the line
 
 Without lyrics.lrc, the placeholder lines in lyrics.example.lrc are used.
 
@@ -21,25 +21,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 
-from baitikochi_chuste import (  # noqa: E402
-    BAR, EIGHTH, SONG, START, TEMPO, TOTAL_BARS, Guitar, bars, play_chords, write_wav,
-)
+from baitikochi_chuste import BEAT, CHART, FIRST_LOOP_BEAT, LENGTH, render, write_wav  # noqa: E402
 
-LENGTH = 62          # seconds of video
 MAX_LINE = 8.0       # a line never stays highlighted longer than this
 LRC = re.compile(r"\[(\d+):(\d+(?:\.\d+)?)\]")
-
-
-def chord_changes():
-    """(time, name) every time the chord changes."""
-    changes, bar = [], 0
-    for section in SONG:
-        for first, second in bars(section):
-            for half, name in enumerate((first, second)):
-                if not changes or changes[-1][1] != name:
-                    changes.append((round(START + bar * BAR + half * 4 * EIGHTH, 3), name))
-            bar += 1
-    return changes
 
 
 def lyric_lines(path):
@@ -61,23 +46,22 @@ def lyric_lines(path):
 
 
 if __name__ == "__main__":
-    guitar = Guitar(seed=7)
-    play_chords(guitar)
-    samples = guitar.render()
-    samples = (samples + [0.0] * (LENGTH * guitar.sr))[: LENGTH * guitar.sr]
-    write_wav(HERE / "chords.wav", samples, guitar.sr)
+    samples, sr = render()
+    write_wav(HERE / "chords.wav", samples, sr)
 
     source = HERE / "lyrics.lrc"
     if not source.exists():
         source = HERE / "lyrics.example.lrc"
     lines = lyric_lines(source)
 
+    pulse = BEAT / 2                      # the song is felt twice as fast as the chord beat
+    start = FIRST_LOOP_BEAT * BEAT
     data = {
         "length": LENGTH,
-        "beat": 60 / TEMPO,
-        "start": START,
-        "beats": TOTAL_BARS * 4,
-        "chords": [{"t": t, "name": name} for t, name in chord_changes()],
+        "beat": pulse,
+        "start": round(start, 3),
+        "beats": int((LENGTH - 1.5 - start) / pulse),
+        "chords": [{"t": round(beat * BEAT, 3), "name": name} for beat, name in CHART],
         "lines": lines,
     }
     (HERE / "data.js").write_text("window.KARAOKE = " + json.dumps(data, ensure_ascii=False, indent=1) + ";\n",
