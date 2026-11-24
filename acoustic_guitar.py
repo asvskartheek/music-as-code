@@ -34,25 +34,45 @@ class Guitar:
         for s in [string] if string else OPEN_STRINGS:
             self.events[s].append((time, None, 0.0))
 
+    def slide(self, time, string, fret, glide=0.09):
+        """Slide the fretting finger to `fret`, arriving at `time`. The note keeps ringing."""
+        self.events[string].append((time, fret, None, glide))
+
     # ---- sound -------------------------------------------------------------
 
     def render(self, dry=False):
         """Return the performance as a list of float samples (mono)."""
         sr = self.sr
-        notes = []  # (start sample, end sample, fade samples, freq, velocity)
+        notes = []  # (start sample, end sample, fade samples, freq, velocity, slides)
         for string, events in self.events.items():
             events = sorted(events, key=lambda e: e[0])
-            for i, (time, fret, velocity) in enumerate(events):
+            slides = {}  # pluck index -> [(sample offset, freq)], one step per fret passed
+            at = at_fret = None
+            for i, event in enumerate(events):
+                time, fret = event[0], event[1]
+                if event[2] is not None:
+                    at, at_fret = (i, fret) if fret is not None else (None, None)
+                elif at is not None and fret != at_fret:
+                    step = 1 if fret > at_fret else -1
+                    passed = range(at_fret + step, fret + step, step)
+                    for j, f in enumerate(passed):
+                        t = time - event[3] * (len(passed) - 1 - j) / len(passed)
+                        offset = max(1, int((t - events[at][0]) * sr))
+                        slides.setdefault(at, []).append((offset, OPEN_STRINGS[string] * 2 ** (f / 12)))
+                    at_fret = fret
+            cuts = [(i, e) for i, e in enumerate(events) if e[2] is not None]  # plucks and mutes end a note; slides don't
+            for i, (index, (time, fret, velocity)) in enumerate(cuts):
                 if fret is None:
                     continue
                 freq = OPEN_STRINGS[string] * 2 ** (fret / 12)
                 ring = _decay_time(freq)
                 end, fade = time + ring, 0.008
-                if i + 1 < len(events) and events[i + 1][0] < end:
-                    end = events[i + 1][0]
+                if i + 1 < len(cuts) and cuts[i + 1][1][0] < end:
+                    end = cuts[i + 1][1][0]
                     # a muting finger damps more softly than a fresh pluck
-                    fade = 0.035 if events[i + 1][1] is None else 0.008
-                notes.append((int(time * sr), int(end * sr), int(fade * sr), freq, velocity))
+                    fade = 0.035 if cuts[i + 1][1][1] is None else 0.008
+                moves = slides.get(index, [])
+                notes.append((int(time * sr), int(end * sr), int(fade * sr), freq, velocity, moves))
 
         length = max(n[1] + n[2] for n in notes) + int(0.4 * sr)
         out = [0.0] * length
@@ -76,22 +96,36 @@ class Guitar:
             f.writeframes(pcm.tobytes())
         return len(samples) / self.sr
 
-    def _string(self, out, start, end, fade, freq, velocity):
+    def _string(self, out, start, end, fade, freq, velocity, slides=()):
         """One plucked note: Karplus-Strong with exact (fractional) tuning."""
         sr = self.sr
-        period = sr / freq
         damp = 0.5  # loop low-pass mix; also delays the loop by `damp` samples
-        n = int(period - damp - 0.1)
-        frac = period - damp - n  # leftover delay, handled by an all-pass
-        c = (1 - frac) / (1 + frac)
-        loss = 0.001 ** (1 / (freq * _decay_time(freq)))  # per-trip gain for a -60 dB decay
 
+        def tune(freq):
+            period = sr / freq
+            n = int(period - damp - 0.1)
+            frac = period - damp - n  # leftover delay, handled by an all-pass
+            loss = 0.001 ** (1 / (freq * _decay_time(freq)))  # per-trip gain for a -60 dB decay
+            return n, (1 - frac) / (1 + frac), loss
+
+        n, c, loss = tune(freq)
         buf = self._pluck_shape(n, velocity)
+        slides = dict(slides)
         count = end - start + fade
         fade_from = count - fade
         prev = ap_in = ap_out = 0.0
         i = 0
         for k in range(count):
+            if k in slides:
+                # the finger moved a fret: squeeze the same wave into a shorter (or longer) ring
+                old, m = buf[i:] + buf[:i], n
+                n, c, loss = tune(slides[k])
+                buf = []
+                for j in range(n):
+                    x = j * m / n
+                    a = int(x)
+                    buf.append(old[a] + (x - a) * (old[(a + 1) % m] - old[a]))
+                i = 0
             d = buf[i]
             lp = loss * ((1 - damp) * d + damp * prev)  # highs fade faster than lows
             prev = d

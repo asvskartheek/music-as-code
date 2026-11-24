@@ -11,6 +11,7 @@ python3 bossa_nova.py   # writes bossa_nova.wav (24.2 s, renders in ~1.5 s)
 | [`acoustic_guitar.py`](acoustic_guitar.py) | The instrument: strings, body, room |
 | [`bossa_nova.py`](bossa_nova.py) | The music: chords, rhythm, human feel |
 | [`explainer/guitar-from-code.html`](explainer/guitar-from-code.html) | 21-page illustrated explainer (open in a browser) |
+| [`examples/baitikochi-chuste/`](examples/baitikochi-chuste/) | Example: a film melody transcribed from a played performance, with slides |
 
 ---
 
